@@ -1,22 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Footer from "@/components/Footer";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 import {
   Heart,
   Share2,
   Users,
   PlusCircle,
+  ExternalLink,
 } from "lucide-react";
 
 export default function Community() {
   const navigate = useNavigate();
+  const { user } = useUser();
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [newPost, setNewPost] = useState({
-    user: "You",
+    user: user?.fullName || user?.username || "You",
     project: "",
     lang: "",
     desc: "",
@@ -114,22 +117,59 @@ export default function Community() {
     },
   ];
 
+  // Load posts from localStorage and merge with initial posts
   const [posts, setPosts] = useState(initialPosts);
-  const [likesMap, setLikesMap] = useState<Record<number, number>>(
-    Object.fromEntries(initialPosts.map((p, i) => [i, p.likes]))
-  );
+  const [likesMap, setLikesMap] = useState<Record<number, number>>({});
+  
+  useEffect(() => {
+    try {
+      // Load posted projects from localStorage
+      const savedPosts = JSON.parse(localStorage.getItem('community_posts') || '[]');
+      
+      // Transform saved posts to match the format
+      const transformedPosts = savedPosts.map((post: any) => ({
+        user: post.user || "Anonymous",
+        project: post.project || "",
+        lang: post.lang || "Other",
+        desc: post.desc || "",
+        likes: post.likes || 0,
+        comments: post.comments || 0,
+        image: post.image || "🆕",
+        tag: post.tag || "General",
+        projectLink: post.projectLink,
+        timestamp: post.timestamp,
+      }));
+      
+      // Merge with initial posts and sort by timestamp (newest first)
+      const allPosts = [...transformedPosts, ...initialPosts].sort((a, b) => {
+        if (a.timestamp && b.timestamp) {
+          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+        }
+        if (a.timestamp) return -1;
+        if (b.timestamp) return 1;
+        return 0;
+      });
+      
+      setPosts(allPosts);
+      setLikesMap(Object.fromEntries(allPosts.map((p, i) => [i, p.likes])));
+    } catch (error) {
+      console.error("Error loading posts:", error);
+      setPosts(initialPosts);
+      setLikesMap(Object.fromEntries(initialPosts.map((p, i) => [i, p.likes])));
+    }
+  }, []);
 
   // 🌍 COMMUNITY CARDS
   const allCommunities = [
-    { name: "AI Builders Hub", members: "4.2k", desc: "Collaborate on AI-powered projects & research." },
-    { name: "Open Source Coders", members: "6.1k", desc: "Contribute, fork, and push open innovation." },
-    { name: "UI/UX Visionaries", members: "2.8k", desc: "Design-first developers making beautiful apps." },
-    { name: "Next.js Wizards", members: "3.9k", desc: "Full-stack devs building for the web of tomorrow." },
-    { name: "Hackathon Heroes", members: "1.5k", desc: "Compete, create, and win with fellow devs." },
-    { name: "Cloud Native Crew", members: "2.3k", desc: "Kubernetes, Docker, and scalable architectures." },
-    { name: "Mobile Mavericks", members: "3.1k", desc: "Cross-platform mobile apps with React Native." },
-    { name: "Cyber Sentinels", members: "1.9k", desc: "Ethical hackers, pen testers, and security experts." },
-    { name: "Game Dev Galaxy", members: "2.5k", desc: "3D, Unreal, and Unity creators sharing their worlds." },
+    { name: "AI Builders Hub", members: "4.2k", desc: "Collaborate on AI-powered projects & research.", link: "https://discord.gg/aibuilders" },
+    { name: "Open Source Coders", members: "6.1k", desc: "Contribute, fork, and push open innovation.", link: "https://discord.gg/opensource" },
+    { name: "UI/UX Visionaries", members: "2.8k", desc: "Design-first developers making beautiful apps.", link: "https://discord.gg/uiux" },
+    { name: "Next.js Wizards", members: "3.9k", desc: "Full-stack devs building for the web of tomorrow.", link: "https://discord.gg/nextjs" },
+    { name: "Hackathon Heroes", members: "1.5k", desc: "Compete, create, and win with fellow devs.", link: "https://discord.gg/hackathon" },
+    { name: "Cloud Native Crew", members: "2.3k", desc: "Kubernetes, Docker, and scalable architectures.", link: "https://discord.gg/cloudnative" },
+    { name: "Mobile Mavericks", members: "3.1k", desc: "Cross-platform mobile apps with React Native.", link: "https://discord.gg/mobile" },
+    { name: "Cyber Sentinels", members: "1.9k", desc: "Ethical hackers, pen testers, and security experts.", link: "https://discord.gg/cybersecurity" },
+    { name: "Game Dev Galaxy", members: "2.5k", desc: "3D, Unreal, and Unity creators sharing their worlds.", link: "https://discord.gg/gamedev" },
   ];
 
   const handleLike = (index: number) => {
@@ -154,10 +194,23 @@ export default function Community() {
 
   const submitNewPost = () => {
     if (!newPost.project.trim() || !newPost.desc.trim()) return;
-    setPosts((prev) => [newPost, ...prev]);
+    
+    // Save to localStorage
+    const savedPosts = JSON.parse(localStorage.getItem('community_posts') || '[]');
+    const postToSave = {
+      ...newPost,
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      user: user?.fullName || user?.username || "You",
+    };
+    savedPosts.unshift(postToSave);
+    localStorage.setItem('community_posts', JSON.stringify(savedPosts));
+    
+    // Update state
+    setPosts((prev) => [postToSave, ...prev]);
     setLikesMap((prev) => ({ 0: newPost.likes, ...Object.fromEntries(Object.entries(prev).map(([k,v]) => [Number(k)+1, v])) }));
     setShowCreatePost(false);
-    setNewPost({ user: "You", project: "", lang: "", desc: "", likes: 0, comments: 0, image: "🆕", tag: "General" });
+    setNewPost({ user: user?.fullName || user?.username || "You", project: "", lang: "", desc: "", likes: 0, comments: 0, image: "🆕", tag: "General" });
   };
 
   return (
@@ -270,12 +323,36 @@ export default function Community() {
                     {/* ⚙️ Action Buttons */}
                     <div className="flex items-center justify-between mt-4 border-t border-border pt-4">
                       <div className="flex items-center gap-5">
-                        <button onClick={() => handleLike(i)} className="flex items-center gap-2 text-muted-foreground hover:text-primary transition">
-                          <Heart className="w-5 h-5" /> {likesMap[i] ?? post.likes}
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLike(i);
+                          }} 
+                          className="flex items-center gap-2 text-muted-foreground hover:text-red-500 transition active:scale-95"
+                        >
+                          <Heart className={`w-5 h-5 ${(likesMap[i] ?? post.likes) > post.likes ? 'fill-red-500 text-red-500' : ''}`} /> 
+                          {likesMap[i] ?? post.likes}
                         </button>
-                        <button onClick={() => handleShare(post)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShare(post);
+                          }} 
+                          className="flex items-center gap-2 text-muted-foreground hover:text-primary transition active:scale-95"
+                        >
                           <Share2 className="w-5 h-5" /> Share
                         </button>
+                        {(post as any).projectLink && (
+                          <a
+                            href={(post as any).projectLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-muted-foreground hover:text-primary transition"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="w-4 h-4" /> View Project
+                          </a>
+                        )}
                       </div>
                       <Button
                         onClick={() => navigate("/ai/workspace")}
@@ -364,6 +441,7 @@ export default function Community() {
           <div className="flex items-center justify-between">
             <Button
               size="sm"
+              onClick={() => c.link ? window.open(c.link, '_blank') : navigate('/ai/community')}
               className="flex-1 bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] hover:opacity-90 transition"
             >
               Join Community

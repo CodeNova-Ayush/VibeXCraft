@@ -6,19 +6,31 @@ import { useUser } from "@clerk/clerk-react";
 
 export default function Analytics() {
   const { user } = useUser();
+  
+  // Check if user is new (no metadata or all zeros)
+  const isNewUser = !user?.publicMetadata || 
+    (!user.publicMetadata.codingHours && 
+     !user.publicMetadata.aiUsage && 
+     !user.publicMetadata.tasksCompleted && 
+     !user.publicMetadata.vibeScore);
 
   const stats = {
     codingHours: (user?.publicMetadata?.codingHours as string) || "0h",
     aiUsage: (user?.publicMetadata?.aiUsage as number) ?? 0,
     tasksCompleted: (user?.publicMetadata?.tasksCompleted as number) ?? 0,
     vibeScore: (user?.publicMetadata?.vibeScore as number) ?? 0,
-    weekly: (user?.publicMetadata?.weekly as number[]) || [0,0,0,0,0,0,0],
-    interactions: (user?.publicMetadata?.interactions as { type: string; count: number; color: string }[]) || [
+    weekly: (user?.publicMetadata?.weekly as number[]) || (isNewUser ? [0,0,0,0,0,0,0] : [10,15,8,20,12,18,14]),
+    interactions: (user?.publicMetadata?.interactions as { type: string; count: number; color: string }[]) || (isNewUser ? [
       { type: "Code Reviews", count: 0, color: "bg-primary" },
       { type: "Optimizations", count: 0, color: "bg-accent" },
       { type: "Bug Fixes", count: 0, color: "bg-primary" },
       { type: "Explanations", count: 0, color: "bg-accent" },
-    ],
+    ] : [
+      { type: "Code Reviews", count: 12, color: "bg-primary" },
+      { type: "Optimizations", count: 8, color: "bg-accent" },
+      { type: "Bug Fixes", count: 15, color: "bg-primary" },
+      { type: "Explanations", count: 10, color: "bg-accent" },
+    ]),
   };
   return (
     <div className="min-h-screen p-8 space-y-6">
@@ -67,8 +79,8 @@ export default function Analytics() {
             {stats.weekly.map((height, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-2">
                 <div 
-                  className="w-full bg-gradient-primary rounded-t-lg transition-all hover:shadow-glow-purple"
-                  style={{ height: `${height}%` }}
+                  className="w-full bg-gradient-primary rounded-t-lg transition-all hover:shadow-glow-purple min-h-[4px]"
+                  style={{ height: `${Math.max(height, isNewUser ? 0 : 5)}%` }}
                 />
                 <span className="text-xs text-muted-foreground">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
@@ -76,6 +88,11 @@ export default function Analytics() {
               </div>
             ))}
           </div>
+          {isNewUser && (
+            <p className="text-center text-sm text-muted-foreground mt-4">
+              Start coding to see your activity here!
+            </p>
+          )}
         </GlassCard>
 
         <GlassCard hover className="p-6">

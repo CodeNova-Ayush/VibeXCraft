@@ -1,13 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SessionControls from '@/components/livePair/SessionControls';
 import MultiFileEditor from '@/components/livePair/MultiFileEditor';
+import { StandaloneEditor } from '@/components/livePair/StandaloneEditor';
 import VoiceChat from '@/components/livePair/VoiceChat';
 import { Code2 } from 'lucide-react';
 
+const PROJECTS_STORAGE_KEY = 'vibexcraft_projects';
+
 export default function Workspace() {
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('project');
   const [currentSession, setCurrentSession] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
   const [peerId] = useState(() => Math.random().toString(36).substring(7));
+  const [projectName, setProjectName] = useState<string>('');
+
+  // Load project name from localStorage
+  useEffect(() => {
+    if (projectId) {
+      try {
+        const stored = localStorage.getItem(PROJECTS_STORAGE_KEY);
+        if (stored) {
+          const projects = JSON.parse(stored);
+          const project = projects.find((p: any) => p.id === projectId);
+          if (project) {
+            setProjectName(project.name || '');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading project:', error);
+      }
+    }
+  }, [projectId]);
 
   const handleSessionJoined = (sessionCode: string, name: string) => {
     setCurrentSession(sessionCode);
@@ -29,7 +54,12 @@ export default function Workspace() {
                 <Code2 className="h-6 w-6 text-primary-foreground" />
               </div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Live Pair Programming Workspace
+                {projectName || 'Workspace'}
+                {currentSession && (
+                  <span className="ml-3 text-sm font-normal text-muted-foreground">
+                    • Live Session: {currentSession}
+                  </span>
+                )}
               </h1>
             </div>
 
@@ -49,17 +79,7 @@ export default function Workspace() {
         {currentSession ? (
           <MultiFileEditor sessionCode={currentSession} />
         ) : (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center space-y-4 max-w-md px-6">
-              <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-6">
-                <Code2 className="h-10 w-10 text-primary-foreground" />
-              </div>
-              <h2 className="text-3xl font-bold">Welcome to Live Pair Programming</h2>
-              <p className="text-muted-foreground text-lg">
-                Create a new session or join an existing one to start coding together in real-time with video calls
-              </p>
-            </div>
-          </div>
+          <StandaloneEditor projectId={projectId || undefined} projectName={projectName || undefined} />
         )}
       </main>
 
@@ -70,13 +90,15 @@ export default function Workspace() {
             <div className="flex items-center gap-2">
               {currentSession ? (
                 <>
-                  <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                   <span className="text-sm text-muted-foreground">
                     Connected to session: <span className="text-foreground font-semibold">{currentSession}</span>
                   </span>
                 </>
               ) : (
-                <span className="text-sm text-muted-foreground">Not connected to any session</span>
+                <span className="text-sm text-muted-foreground">
+                  {projectName ? `Editing: ${projectName}` : 'Standalone Workspace • Create or join a session for real-time collaboration'}
+                </span>
               )}
             </div>
 

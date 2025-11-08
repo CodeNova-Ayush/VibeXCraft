@@ -26,6 +26,7 @@ import Agent from "./pages/Agent";
 import Query from "./pages/Query";
 import Events from "./pages/Events";
 import LivePair from "./pages/LivePair";
+import GitHubCallback from "./pages/GitHubCallback";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ function App() {
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/auth/github/callback" element={<GitHubCallback />} />
             
             {/* Protected Routes */}
             <Route

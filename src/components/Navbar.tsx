@@ -38,14 +38,11 @@ const Navbar: React.FC = () => {
     { name: "Dashboard", icon: LayoutDashboard, path: "/ai/dashboard" },
     { name: "Projects", icon: Folder, path: "/ai/projects" },
     { name: "AI Copilot", icon: Bot, path: "/ai/copilot" },
-    { name: "AI Bot", icon: Bot, path: "/ai/copilot" },
-    { name: "AI Agent", icon: Bot, path: "/ai/agent" },
     { name: "Community", icon: Users, path: "/ai/community" },
     { name: "Workspace", icon: Code, path: "/ai/workspace" },
     { name: "Events", icon: Calendar, path: "/ai/events" },
     { name: "Analytics", icon: BarChart3, path: "/ai/analytics" },
     { name: "Profile", icon: Users, path: "/ai/profile" },
-    { name: "GitHub Sync", icon: Github, path: "/ai/settings" },
     { name: "Settings", icon: Settings, path: "/ai/settings" },
   ];
 

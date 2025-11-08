@@ -58,14 +58,7 @@ const Hero: React.FC = () => {
             {isSignedIn ? "Go to Dashboard" : "Start Creating"}
           </button>
 
-          <button
-            onClick={() => navigate("/ai/projects")}
-            className="border border-[hsl(var(--neon-purple))] text-[hsl(var(--neon-purple))]
-                       font-semibold px-8 py-3 rounded-full 
-                       hover:bg-[hsl(var(--neon-purple))]/10 hover:text-white transition-all duration-300"
-          >
-            Explore Tools
-          </button>
+          
         </div>
       </div>
 

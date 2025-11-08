@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Events() {
+  const [showAllHackathons, setShowAllHackathons] = useState(false);
+  const [showAllOpenSource, setShowAllOpenSource] = useState(false);
+  const [showAllContests, setShowAllContests] = useState(false);
+  const [showAllMeetups, setShowAllMeetups] = useState(false);
   const hackathons = [
     {
       name: "AI Innovation Sprint",
@@ -154,8 +159,9 @@ export default function Events() {
         </TabsList>
 
         {/* 🏆 Hackathons */}
-        <TabsContent value="hackathons" className="mt-8 grid md:grid-cols-2 gap-6">
-          {hackathons.slice(0, 4).map((h, i) => (
+        <TabsContent value="hackathons" className="mt-8 space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {(showAllHackathons ? hackathons : hackathons.slice(0, 4)).map((h, i) => (
             <GlassCard
               key={i}
               hover
@@ -180,17 +186,25 @@ export default function Events() {
                 Join Hackathon
               </Button>
             </GlassCard>
-          ))}
-          {hackathons.length > 4 && (
-            <div className="md:col-span-2 flex justify-center">
-              <Button onClick={() => (window.location.href = '#/ai/events') } variant="secondary">Explore More</Button>
+            ))}
+          </div>
+          {!showAllHackathons && hackathons.length > 4 && (
+            <div className="flex justify-center">
+              <Button 
+                onClick={() => setShowAllHackathons(true)}
+                variant="secondary"
+                className="px-6 py-2"
+              >
+                Explore More ({hackathons.length - 4} more)
+              </Button>
             </div>
           )}
         </TabsContent>
 
         {/* 🌐 Open Source */}
-        <TabsContent value="opensource" className="mt-8 grid md:grid-cols-2 gap-6">
-          {openSource.slice(0, 4).map((o, i) => (
+        <TabsContent value="opensource" className="mt-8 space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {(showAllOpenSource ? openSource : openSource.slice(0, 4)).map((o, i) => (
             <GlassCard
               key={i}
               hover
@@ -215,11 +229,24 @@ export default function Events() {
               </Button>
             </GlassCard>
           ))}
+          </div>
+          {!showAllOpenSource && openSource.length > 4 && (
+            <div className="flex justify-center">
+              <Button 
+                onClick={() => setShowAllOpenSource(true)}
+                variant="secondary"
+                className="px-6 py-2"
+              >
+                Explore More ({openSource.length - 4} more)
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* 💻 Competitive Programming */}
-        <TabsContent value="contests" className="mt-8 grid md:grid-cols-2 gap-6">
-          {contests.slice(0, 4).map((c, i) => (
+        <TabsContent value="contests" className="mt-8 space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {(showAllContests ? contests : contests.slice(0, 4)).map((c, i) => (
             <GlassCard
               key={i}
               hover
@@ -244,11 +271,24 @@ export default function Events() {
               </Button>
             </GlassCard>
           ))}
+          </div>
+          {!showAllContests && contests.length > 4 && (
+            <div className="flex justify-center">
+              <Button 
+                onClick={() => setShowAllContests(true)}
+                variant="secondary"
+                className="px-6 py-2"
+              >
+                Explore More ({contests.length - 4} more)
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* 🤝 Meetups */}
-        <TabsContent value="meetups" className="mt-8 grid md:grid-cols-2 gap-6">
-          {meetups.slice(0, 4).map((m, i) => (
+        <TabsContent value="meetups" className="mt-8 space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {(showAllMeetups ? meetups : meetups.slice(0, 4)).map((m, i) => (
             <GlassCard
               key={i}
               hover
@@ -273,6 +313,18 @@ export default function Events() {
               </Button>
             </GlassCard>
           ))}
+          </div>
+          {!showAllMeetups && meetups.length > 4 && (
+            <div className="flex justify-center">
+              <Button 
+                onClick={() => setShowAllMeetups(true)}
+                variant="secondary"
+                className="px-6 py-2"
+              >
+                Explore More ({meetups.length - 4} more)
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -287,6 +339,7 @@ export default function Events() {
         <Button
           variant="secondary"
           size="sm"
+          onClick={() => window.location.href = '/ai/copilot'}
           className="mx-auto bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF]"
         >
           View More Suggestions

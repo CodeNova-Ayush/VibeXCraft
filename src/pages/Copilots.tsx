@@ -1,119 +1,69 @@
 import { useState } from "react";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Code2, Video, Brain, Wand2, Sparkles } from "lucide-react";
+import { Bot, Send, Loader2 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  callCodeCopilot, 
-  callMeetingCopilot, 
-  callTutorCopilot, 
-  callDesignCopilot, 
-  callWorkflowCopilot 
-} from "@/lib/copilots";
+import { callCodeCopilot } from "@/lib/copilots";
 
 export default function Copilots() {
   const { toast } = useToast();
-  const [activeCopilot, setActiveCopilot] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
-  const [enabled, setEnabled] = useState<Record<string, boolean>>({
-    code: true,
-    meeting: true,
-    tutor: true,
-    design: true,
-    workflow: true,
-  });
+  const [conversation, setConversation] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
 
-  const copilots = [
-    {
-      id: "code",
-      name: "Code Copilot",
-      desc: "Writes, debugs, and explains code inline.",
-      icon: Code2,
-      accent: "bg-gradient-to-br from-[#1F1B6B] to-[#5C33FF]",
-    },
-    {
-      id: "meeting",
-      name: "Meeting Copilot",
-      desc: "Records, summarizes and generates action items.",
-      icon: Video,
-      accent: "bg-gradient-to-br from-[#022B3A] to-[#00E0FF]",
-    },
-    {
-      id: "tutor",
-      name: "Tutor Copilot",
-      desc: "Teaches concepts and generates practice tasks.",
-      icon: Brain,
-      accent: "bg-gradient-to-br from-[#2E1F4A] to-[#9B5CF5]",
-    },
-    {
-      id: "design",
-      name: "Design Copilot",
-      desc: "Suggests UI tweaks, color harmony and CSS snippets.",
-      icon: Wand2,
-      accent: "bg-gradient-to-br from-[#0B3B2E] to-[#22D3EE]",
-    },
-    {
-      id: "workflow",
-      name: "Workflow Copilot",
-      desc: "Plans sprints and auto-generates Kanban boards.",
-      icon: Sparkles,
-      accent: "bg-gradient-to-br from-[#2B2A4A] to-[#7C3AED]",
-    },
-  ];
-
-  const handleCopilotCall = async (copilotId: string) => {
+  const handleSendMessage = async () => {
     if (!message.trim()) {
       toast({
         title: "Message required",
-        description: "Please enter a message to send to the copilot",
+        description: "Please enter a message",
         variant: "destructive",
       });
       return;
     }
 
+    const userMessage = message.trim();
+    setMessage("");
     setLoading(true);
-    setResponse("");
+
+    // Add user message to conversation
+    const newConversation = [...conversation, { role: 'user' as const, content: userMessage }];
+    setConversation(newConversation);
 
     try {
-      let result;
-      switch (copilotId) {
-        case "code":
-          result = await callCodeCopilot(message);
-          break;
-        case "meeting":
-          result = await callMeetingCopilot(message);
-          break;
-        case "tutor":
-          result = await callTutorCopilot(message);
-          break;
-        case "design":
-          result = await callDesignCopilot(message);
-          break;
-        case "workflow":
-          result = await callWorkflowCopilot(message);
-          break;
-        default:
-          throw new Error("Unknown copilot");
-      }
+      const result = await callCodeCopilot(userMessage);
 
       if (result.success) {
-        setResponse(result.response);
+        const assistantResponse = result.response;
+        setResponse(assistantResponse);
+        setConversation([...newConversation, { role: 'assistant' as const, content: assistantResponse }]);
         toast({
           title: "Success",
-          description: `${copilots.find(c => c.id === copilotId)?.name} responded!`,
+          description: "AI Copilot responded!",
         });
       } else {
-        throw new Error(result.error || "Failed to get response");
+        const errorMsg = result.error || "Failed to get response";
+        throw new Error(errorMsg);
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Failed to call copilot";
+      // Better error message for OpenAI API issues
+      let errorResponse = `❌ Error: ${errorMsg}\n\n`;
+      
+      if (errorMsg.includes('API key') || errorMsg.includes('OPENAI_API_KEY')) {
+        errorResponse += `Make sure your OpenAI API key is set in server/.env file:\nOPENAI_API_KEY=your_api_key_here\n\n`;
+        errorResponse += `Get your API key from: https://platform.openai.com/api-keys\n\n`;
+      }
+      
+      errorResponse += `Make sure the backend server is running on port 3001.\n\nTo start the server, run:\ncd server\nnpm start`;
+      
+      setResponse(errorResponse);
+      setConversation([...newConversation, { role: 'assistant' as const, content: errorResponse }]);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to call copilot",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
@@ -121,161 +71,147 @@ export default function Copilots() {
     }
   };
 
+  const handleClearConversation = () => {
+    setConversation([]);
+    setResponse("");
+    setMessage("");
+  };
+
   return (
     <div className="min-h-screen p-8 space-y-6">
-      <div>
-        <h1 className="text-4xl font-bold bg-gradient-hero bg-clip-text text-transparent">
-          Meet Your Copilots
-        </h1>
-        <p className="text-muted-foreground mt-1">AI assistants for every part of your workflow</p>
-      </div>
-
-      <div className="flex items-center justify-end">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() =>
-            toast({ title: "More Suggestions", description: "Personalized copilot suggestions coming soon." })
-          }
-        >
-          More Suggestions
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {copilots.map((copilot, i) => (
-          <GlassCard 
-            key={i} 
-            hover 
-            className={`p-6 space-y-4 transition-all ${
-              activeCopilot === copilot.id ? 'ring-2 ring-primary' : ''
-            }`}
-          >
-            <div className="cursor-pointer" onClick={() => setActiveCopilot(copilot.id)}>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-2xl ${copilot.accent} flex items-center justify-center shadow-glow-purple`}>
-                  <copilot.icon className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">{copilot.name}</h3>
-                  <p className="text-sm text-muted-foreground">{copilot.desc}</p>
-                </div>
-              </div>
-              <Switch 
-                checked={enabled[copilot.id as keyof typeof enabled]}
-                onCheckedChange={(checked) => 
-                  setEnabled(prev => ({ ...prev, [copilot.id]: checked }))
-                }
-              />
-            </div>
-
-            {copilot.id === 'code' && (
-              <div className="inline-flex items-center gap-2 text-xs text-accent bg-accent/10 px-2 py-1 rounded-md">
-                ⭐ Best Copilot
-              </div>
-            )}
-
-            </div>
-
-            <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                variant="secondary" 
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveCopilot(copilot.id);
-                }}
-              >
-                Use Copilot
-              </Button>
-              <Button 
-                size="sm" 
-                className="bg-primary/10 hover:bg-primary/20"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Navigate to settings or customize
-                }}
-              >
-                Settings
-              </Button>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
-
-      {/* Copilot Chat Interface */}
-      {activeCopilot && (
-        <GlassCard className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">
-              {copilots.find(c => c.id === activeCopilot)?.name}
-            </h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setActiveCopilot(null);
-                setMessage("");
-                setResponse("");
-              }}
-            >
-              Close
-            </Button>
+      <div className="text-center space-y-2">
+        <div className="flex items-center justify-center gap-3">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#9B5CF5] to-[#00E0FF] flex items-center justify-center shadow-glow-purple">
+            <Bot className="w-8 h-8 text-white" />
           </div>
-
-          <div className="space-y-4">
-            <div>
-              <Input
-                placeholder="Ask your copilot anything..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleCopilotCall(activeCopilot);
-                  }
-                }}
-                disabled={loading}
-              />
-            </div>
-
-            <Button
-              onClick={() => handleCopilotCall(activeCopilot)}
-              disabled={loading || !message.trim()}
-              className="w-full bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF]"
-            >
-              {loading ? "Processing..." : "Send Message"}
-            </Button>
-
-            {response && (
-              <div className="p-4 bg-secondary/50 rounded-lg border border-border">
-                <h3 className="font-semibold mb-2">Response:</h3>
-                <p className="text-sm whitespace-pre-wrap">{response}</p>
-              </div>
-            )}
-          </div>
-        </GlassCard>
-      )}
-
-      <GlassCard className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-accent" />
-          <h2 className="text-xl font-semibold">AI Memory</h2>
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] bg-clip-text text-transparent">
+            AI Copilot
+          </h1>
         </div>
-        
-        <div className="space-y-3 text-sm">
-          <div className="p-3 bg-secondary/50 rounded-xl">
-            <p className="text-muted-foreground">Last interaction: Code optimization for React components</p>
-            <span className="text-xs text-muted-foreground">2 hours ago</span>
+        <p className="text-muted-foreground text-lg">
+          Your intelligent assistant for code, meetings, design, learning, and workflow
+        </p>
+      </div>
+
+      <GlassCard className="p-6 space-y-4 max-w-4xl mx-auto">
+        {/* Conversation History */}
+        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+          {conversation.length === 0 ? (
+            <div className="text-center py-12 space-y-4">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#9B5CF5] to-[#00E0FF] flex items-center justify-center mx-auto shadow-glow-purple">
+                <Bot className="w-10 h-10 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Start a conversation</h3>
+                <p className="text-muted-foreground">
+                  Ask me anything about coding, design, workflows, meetings, or learning.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center mt-6">
+                {[
+                  "How do I create a React component?",
+                  "Suggest a color palette for dark theme",
+                  "Explain JavaScript closures",
+                  "Plan a sprint for a web app",
+                ].map((suggestion, i) => (
+                  <Button
+                    key={i}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMessage(suggestion)}
+                    className="text-xs"
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            conversation.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg p-4 ${
+                    msg.role === 'user'
+                      ? 'bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] text-white'
+                      : 'bg-secondary/50 border border-border'
+                  }`}
+                >
+                  <div className="flex items-start gap-2 mb-2">
+                    {msg.role === 'assistant' && (
+                      <Bot className="w-4 h-4 mt-1 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <div className="text-sm font-medium mb-1">
+                        {msg.role === 'user' ? 'You' : 'AI Copilot'}
+                      </div>
+                      <div className="text-sm whitespace-pre-wrap">
+                        {msg.content}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-secondary/50 border border-border rounded-lg p-4">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input Area */}
+        <div className="space-y-3 border-t border-border pt-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Ask your AI Copilot anything..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              disabled={loading}
+              className="flex-1"
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={loading || !message.trim()}
+              className="bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] hover:opacity-90"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+            {conversation.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleClearConversation}
+                disabled={loading}
+              >
+                Clear
+              </Button>
+            )}
           </div>
-          <div className="p-3 bg-secondary/50 rounded-xl">
-            <p className="text-muted-foreground">Task prioritization updated based on deadlines</p>
-            <span className="text-xs text-muted-foreground">1 day ago</span>
-          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Press Enter to send, Shift+Enter for new line
+          </p>
         </div>
       </GlassCard>
+
       <Footer />
     </div>
   );

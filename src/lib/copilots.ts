@@ -32,14 +32,20 @@ export async function callCodeCopilot(
       body: JSON.stringify({ message, code, language, context }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Code Copilot Error:', error);
     return {
       success: false,
       response: '',
       copilot: 'Code Copilot',
-      error: error instanceof Error ? error.message : 'Failed to call Code Copilot',
+      error: error instanceof Error ? error.message : 'Failed to call Code Copilot. Make sure the server is running on port 3001.',
     };
   }
 }
@@ -59,14 +65,20 @@ export async function callMeetingCopilot(
       body: JSON.stringify({ message, transcript, participants }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Meeting Copilot Error:', error);
     return {
       success: false,
       response: '',
       copilot: 'Meeting Copilot',
-      error: error instanceof Error ? error.message : 'Failed to call Meeting Copilot',
+      error: error instanceof Error ? error.message : 'Failed to call Meeting Copilot. Make sure the server is running on port 3001.',
     };
   }
 }
@@ -87,14 +99,20 @@ export async function callTutorCopilot(
       body: JSON.stringify({ message, topic, level, context }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Tutor Copilot Error:', error);
     return {
       success: false,
       response: '',
       copilot: 'Tutor Copilot',
-      error: error instanceof Error ? error.message : 'Failed to call Tutor Copilot',
+      error: error instanceof Error ? error.message : 'Failed to call Tutor Copilot. Make sure the server is running on port 3001.',
     };
   }
 }
@@ -115,14 +133,20 @@ export async function callDesignCopilot(
       body: JSON.stringify({ message, designType, currentDesign, context }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Design Copilot Error:', error);
     return {
       success: false,
       response: '',
       copilot: 'Design Copilot',
-      error: error instanceof Error ? error.message : 'Failed to call Design Copilot',
+      error: error instanceof Error ? error.message : 'Failed to call Design Copilot. Make sure the server is running on port 3001.',
     };
   }
 }
@@ -143,14 +167,20 @@ export async function callWorkflowCopilot(
       body: JSON.stringify({ message, projectType, tasks, context }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error('Workflow Copilot Error:', error);
     return {
       success: false,
       response: '',
       copilot: 'Workflow Copilot',
-      error: error instanceof Error ? error.message : 'Failed to call Workflow Copilot',
+      error: error instanceof Error ? error.message : 'Failed to call Workflow Copilot. Make sure the server is running on port 3001.',
     };
   }
 }
@@ -170,14 +200,20 @@ export async function callCopilot(
       body: JSON.stringify({ message, ...context }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
+    console.error(`${type} Copilot Error:`, error);
     return {
       success: false,
       response: '',
       copilot: `${type.charAt(0).toUpperCase() + type.slice(1)} Copilot`,
-      error: error instanceof Error ? error.message : `Failed to call ${type} Copilot`,
+      error: error instanceof Error ? error.message : `Failed to call ${type} Copilot. Make sure the server is running on port 3001.`,
     };
   }
 }

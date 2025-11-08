@@ -2,12 +2,32 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
+// Validate environment variables
+if (!SUPABASE_URL) {
+  console.error('❌ VITE_SUPABASE_URL is not set in .env file');
+  console.error('Please add VITE_SUPABASE_URL to your .env file');
+}
 
+if (!SUPABASE_PUBLISHABLE_KEY) {
+  console.error('❌ VITE_SUPABASE_PUBLISHABLE_KEY is not set in .env file');
+  console.error('Please add VITE_SUPABASE_PUBLISHABLE_KEY to your .env file');
+}
+
+// Validate that both URL and key are provided
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error(
+    `Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your .env file.\n` +
+    `Current values:\n` +
+    `  VITE_SUPABASE_URL: ${SUPABASE_URL ? 'set' : 'NOT SET'}\n` +
+    `  VITE_SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY ? 'set' : 'NOT SET'}\n` +
+    `\nGet these from: https://app.supabase.com > Project Settings > API`
+  );
+}
+
+// Create Supabase client
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,

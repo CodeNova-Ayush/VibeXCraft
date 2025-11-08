@@ -25,10 +25,22 @@ import {
   Bell,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import PricingSection from "../components/PricingSection";
 import Footer from "../components/Footer";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
-import { ChevronLeft, ChevronRight } from "lucide-react"; 
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"; 
 
 /**
  * VibeXCraft Dashboard
@@ -152,30 +164,40 @@ const COPILOTS = [
     desc: "Writes, debugs, and explains code inline.",
     icon: Code,
     accent: "bg-gradient-to-br from-[#1F1B6B] to-[#5C33FF]",
+    isActive: true,
+    isBest: true,
   },
   {
     name: "Meeting Copilot",
     desc: "Records, summarizes and generates action items.",
     icon: Video,
     accent: "bg-gradient-to-br from-[#022B3A] to-[#00E0FF]",
+    isActive: true,
+    isBest: false,
   },
   {
     name: "Tutor Copilot",
     desc: "Teaches concepts and generates practice tasks.",
     icon: Brain,
     accent: "bg-gradient-to-br from-[#2E1F4A] to-[#9B5CF5]",
+    isActive: true,
+    isBest: false,
   },
   {
     name: "Design Copilot",
     desc: "Suggests UI tweaks, color harmony and CSS snippets.",
     icon: Wand2,
     accent: "bg-gradient-to-br from-[#0B3B2E] to-[#22D3EE]",
+    isActive: false,
+    isBest: false,
   },
   {
     name: "Workflow Copilot",
     desc: "Plans sprints and auto-generates Kanban boards.",
     icon: Sparkles,
     accent: "bg-gradient-to-br from-[#2B2A4A] to-[#7C3AED]",
+    isActive: true,
+    isBest: false,
   },
 ];
 
@@ -262,11 +284,199 @@ const FEATURES_FULL = [
 
 
 
+// User Analytics/Scores Storage Key
+const USER_SCORES_KEY = "user_dashboard_scores";
+
+interface UserScores {
+  vibeScore: number;
+  focusRate: number;
+  weeklyCodingHours: number;
+  vibeScoreChange: number; // percentage change
+  focusAvgHours: number; // average hours per day
+}
+
 const Dashboard: React.FC = () => {
   const [slideIndex, setSlideIndex] = useState<number>(0);
   const [paused, setPaused] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
   const slideTimerRef = useRef<number | null>(null);
+  
+  // Dialog states for custom score entry
+  const [isVibeDialogOpen, setIsVibeDialogOpen] = useState(false);
+  const [isFocusDialogOpen, setIsFocusDialogOpen] = useState(false);
+  const [isHoursDialogOpen, setIsHoursDialogOpen] = useState(false);
+  const [customVibeScore, setCustomVibeScore] = useState("");
+  const [customFocusRate, setCustomFocusRate] = useState("");
+  const [customHours, setCustomHours] = useState("");
+  
+  // Load user scores from localStorage or initialize to 0
+  const loadScores = (): UserScores => {
+    try {
+      const stored = localStorage.getItem(USER_SCORES_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error("Error loading scores:", error);
+    }
+    // Default all scores to 0
+    return {
+      vibeScore: 0,
+      focusRate: 0,
+      weeklyCodingHours: 0,
+      vibeScoreChange: 0,
+      focusAvgHours: 0,
+    };
+  };
+
+  const [scores, setScores] = useState<UserScores>(loadScores);
+  
+  // Save scores to localStorage
+  useEffect(() => {
+    localStorage.setItem(USER_SCORES_KEY, JSON.stringify(scores));
+  }, [scores]);
+  
+  // Function to add points to vibe score
+  const addVibeScore = (points: number) => {
+    setScores(prev => {
+      const oldScore = prev.vibeScore;
+      const newScore = Math.min(100, Math.max(0, prev.vibeScore + points));
+      const change = newScore - oldScore;
+      return {
+        ...prev,
+        vibeScore: newScore,
+        vibeScoreChange: Math.max(0, prev.vibeScoreChange + Math.abs(change)),
+      };
+    });
+    toast({
+      title: "Vibe Score Updated",
+      description: `Added ${points} points. New score: ${Math.min(100, scores.vibeScore + points)}/100`,
+    });
+  };
+  
+  // Function to set custom vibe score
+  const setCustomVibeScoreValue = () => {
+    const value = parseInt(customVibeScore);
+    if (isNaN(value) || value < 0 || value > 100) {
+      toast({
+        title: "Invalid value",
+        description: "Vibe Score must be between 0 and 100",
+        variant: "destructive",
+      });
+      return;
+    }
+    setScores(prev => {
+      const change = value - prev.vibeScore;
+      return {
+        ...prev,
+        vibeScore: value,
+        vibeScoreChange: Math.max(0, prev.vibeScoreChange + Math.abs(change)),
+      };
+    });
+    setCustomVibeScore("");
+    setIsVibeDialogOpen(false);
+    toast({
+      title: "Vibe Score Updated",
+      description: `Vibe Score set to ${value}/100`,
+    });
+  };
+  
+  // Function to add focus rate
+  const addFocusRate = (percentage: number) => {
+    setScores(prev => {
+      const newRate = Math.min(100, Math.max(0, prev.focusRate + percentage));
+      return {
+        ...prev,
+        focusRate: newRate,
+      };
+    });
+    toast({
+      title: "Focus Rate Updated",
+      description: `Added ${percentage}%. New rate: ${Math.min(100, scores.focusRate + percentage)}%`,
+    });
+  };
+  
+  // Function to set custom focus rate
+  const setCustomFocusRateValue = () => {
+    const value = parseFloat(customFocusRate);
+    if (isNaN(value) || value < 0 || value > 100) {
+      toast({
+        title: "Invalid value",
+        description: "Focus Rate must be between 0 and 100",
+        variant: "destructive",
+      });
+      return;
+    }
+    setScores(prev => ({
+      ...prev,
+      focusRate: value,
+    }));
+    setCustomFocusRate("");
+    setIsFocusDialogOpen(false);
+    toast({
+      title: "Focus Rate Updated",
+      description: `Focus Rate set to ${value}%`,
+    });
+  };
+  
+  // Function to add coding hours
+  const addCodingHours = (hours: number) => {
+    setScores(prev => {
+      const newHours = Math.max(0, prev.weeklyCodingHours + hours);
+      const avgHours = newHours / 7; // Calculate average per day
+      return {
+        ...prev,
+        weeklyCodingHours: newHours,
+        focusAvgHours: avgHours,
+      };
+    });
+    toast({
+      title: "Coding Hours Updated",
+      description: `Added ${hours} hour(s). Total: ${(scores.weeklyCodingHours + hours).toFixed(1)}h`,
+    });
+  };
+  
+  // Function to set custom coding hours
+  const setCustomHoursValue = () => {
+    const value = parseFloat(customHours);
+    if (isNaN(value) || value < 0) {
+      toast({
+        title: "Invalid value",
+        description: "Coding hours must be a positive number",
+        variant: "destructive",
+      });
+      return;
+    }
+    setScores(prev => ({
+      ...prev,
+      weeklyCodingHours: value,
+      focusAvgHours: value / 7,
+    }));
+    setCustomHours("");
+    setIsHoursDialogOpen(false);
+    toast({
+      title: "Coding Hours Updated",
+      description: `Weekly coding hours set to ${value.toFixed(1)}h`,
+    });
+  };
+  
+  // Function to reset all scores
+  const resetScores = () => {
+    const resetScores: UserScores = {
+      vibeScore: 0,
+      focusRate: 0,
+      weeklyCodingHours: 0,
+      vibeScoreChange: 0,
+      focusAvgHours: 0,
+    };
+    setScores(resetScores);
+    localStorage.setItem(USER_SCORES_KEY, JSON.stringify(resetScores));
+    toast({
+      title: "Scores Reset",
+      description: "All scores have been reset to 0",
+    });
+  };
 
   useEffect(() => {
     const start = () => {
@@ -430,10 +640,18 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 rounded-md border border-border text-muted-foreground hover:bg-white/5 transition">
+          <button 
+            onClick={() => navigate('/ai/copilot')}
+            className="px-4 py-2 rounded-md border border-border text-muted-foreground hover:bg-white/5 transition"
+          >
             Manage Copilots
           </button>
-          
+          <button 
+            onClick={() => navigate('/ai/copilot')}
+            className="px-4 py-2 rounded-md bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] text-white font-medium hover:scale-105 transition"
+          >
+            More Suggestions
+          </button>
         </div>
       </div>
 
@@ -463,7 +681,17 @@ className={`snap-center min-w-[300px] p-6 rounded-2xl bg-gradient-to-br ${c.acce
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#9B5CF5] to-[#00E0FF] flex items-center justify-center text-white text-2xl shadow-lg">
                   {React.createElement(c.icon, { className: "w-6 h-6" })}
                 </div>
-                <h3 className="font-semibold text-lg">{c.name}</h3>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-lg">{c.name}</h3>
+                    {c.isBest && (
+                      <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">⭐ Best</span>
+                    )}
+                    {c.isActive && (
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">● Active</span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Description */}
@@ -474,7 +702,7 @@ className={`snap-center min-w-[300px] p-6 rounded-2xl bg-gradient-to-br ${c.acce
               {/* Buttons */}
               <div className="flex gap-2">
                 <button onClick={() => navigate('/ai/copilot')} className="flex-1 px-4 py-2 rounded-md bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] text-white text-sm font-medium hover:scale-105 transition">
-                  Activate
+                  {c.isActive ? 'Active' : 'Activate'}
                 </button>
                 <button onClick={() => navigate('/ai/copilot')} className="flex-1 px-4 py-2 rounded-md bg-[#181818]/80 border border-white/10 text-muted-foreground text-sm hover:bg-[#222] transition">
                   Customize
@@ -679,10 +907,16 @@ export default function Box() {
             <button onClick={() => navigate('/ai/projects')} className="px-4 py-1.5 rounded-md bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] text-white text-sm hover:scale-105 transition">
               Open
             </button>
-            <button className="px-4 py-1.5 rounded-md bg-[#181818] border border-white/10 text-muted-foreground text-sm hover:bg-[#1E1E1E] transition">
+            <button 
+              onClick={() => window.open(`https://github.com/jharajiv16/${p.name}`, '_blank')}
+              className="px-4 py-1.5 rounded-md bg-[#181818] border border-white/10 text-muted-foreground text-sm hover:bg-[#1E1E1E] transition"
+            >
               Fork
             </button>
-            <button className="px-4 py-1.5 rounded-md bg-[#181818] border border-white/10 text-muted-foreground text-sm hover:bg-[#1E1E1E] transition">
+            <button 
+              onClick={() => navigate('/ai/copilot')}
+              className="px-4 py-1.5 rounded-md bg-[#181818] border border-white/10 text-muted-foreground text-sm hover:bg-[#1E1E1E] transition"
+            >
               AI Review
             </button>
           </div>
@@ -699,6 +933,7 @@ export default function Box() {
     <div className="flex justify-center mt-12">
       <motion.button
         whileHover={{ scale: 1.08 }}
+        onClick={() => navigate('/ai/projects')}
         className="px-8 py-3 rounded-xl bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] text-white font-medium shadow-[0_0_25px_rgba(155,92,245,0.4)] hover:shadow-[0_0_35px_rgba(0,224,255,0.3)] transition-all"
       >
         Explore More Projects →
@@ -743,36 +978,42 @@ export default function Box() {
           desc: "Collaborate on AI-powered projects & participate in weekly sprints.",
           members: "4.5k",
           color: "from-[#9B5CF5]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/aibuilders",
         },
         {
           name: "Open Source Coders",
           desc: "Contribute, fork, and discuss open-source initiatives worldwide.",
           members: "6.8k",
           color: "from-[#00E0FF]/30 to-[#22D3EE]/30",
+          link: "https://discord.gg/opensource",
         },
         {
           name: "Hackathon Central",
           desc: "Weekly hackathons with real prizes, mentors & community builds.",
           members: "2.2k",
           color: "from-[#9333EA]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/hackathon",
         },
         {
           name: "Designers & Devs",
           desc: "Where design meets development — prototypes, feedback, collabs.",
           members: "3.4k",
           color: "from-[#EC4899]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/designers",
         },
         {
           name: "Future Founders",
           desc: "Entrepreneurs & coders turning side projects into startups.",
           members: "1.8k",
           color: "from-[#00E0FF]/30 to-[#7C3AED]/30",
+          link: "https://discord.gg/founders",
         },
         {
           name: "Data Science Tribe",
           desc: "AI, ML, and data visualization enthusiasts building smarter tools.",
           members: "2.9k",
           color: "from-[#7C3AED]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/datascience",
         },
       ], ...[
         // Duplicate for seamless loop
@@ -781,36 +1022,42 @@ export default function Box() {
           desc: "Collaborate on AI-powered projects & participate in weekly sprints.",
           members: "4.5k",
           color: "from-[#9B5CF5]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/aibuilders",
         },
         {
           name: "Open Source Coders",
           desc: "Contribute, fork, and discuss open-source initiatives worldwide.",
           members: "6.8k",
           color: "from-[#00E0FF]/30 to-[#22D3EE]/30",
+          link: "https://discord.gg/opensource",
         },
         {
           name: "Hackathon Central",
           desc: "Weekly hackathons with real prizes, mentors & community builds.",
           members: "2.2k",
           color: "from-[#9333EA]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/hackathon",
         },
         {
           name: "Designers & Devs",
           desc: "Where design meets development — prototypes, feedback, collabs.",
           members: "3.4k",
           color: "from-[#EC4899]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/designers",
         },
         {
           name: "Future Founders",
           desc: "Entrepreneurs & coders turning side projects into startups.",
           members: "1.8k",
           color: "from-[#00E0FF]/30 to-[#7C3AED]/30",
+          link: "https://discord.gg/founders",
         },
         {
           name: "Data Science Tribe",
           desc: "AI, ML, and data visualization enthusiasts building smarter tools.",
           members: "2.9k",
           color: "from-[#7C3AED]/30 to-[#00E0FF]/30",
+          link: "https://discord.gg/datascience",
         },
       ]].map((c, i) => (
         <motion.div
@@ -839,10 +1086,16 @@ export default function Box() {
 
           {/* Buttons */}
           <div className="flex gap-2">
-            <button onClick={() => navigate('/ai/community')} className="px-4 py-2 rounded-md bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] text-white text-sm hover:scale-105 transition">
+            <button 
+              onClick={() => c.link ? window.open(c.link, '_blank') : navigate('/ai/community')} 
+              className="px-4 py-2 rounded-md bg-gradient-to-r from-[#9B5CF5] to-[#00E0FF] text-white text-sm hover:scale-105 transition"
+            >
               Join
             </button>
-            <button onClick={() => navigate('/ai/community')} className="px-4 py-2 rounded-md bg-[#181818] border border-white/10 text-muted-foreground text-sm hover:bg-[#1E1E1E] transition">
+            <button 
+              onClick={() => navigate('/ai/community')} 
+              className="px-4 py-2 rounded-md bg-[#181818] border border-white/10 text-muted-foreground text-sm hover:bg-[#1E1E1E] transition"
+            >
               View Feed
             </button>
           </div>
@@ -864,11 +1117,21 @@ export default function Box() {
 
       {/* ⚡ Analytics & Vibe Score (Circular UI) */}
 <section className="mx-6 sm:mx-10 lg:mx-20 mb-24 text-foreground">
-  <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-center">
-    Analytics & Vibe Score 📊
-  </h2>
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-3xl sm:text-4xl font-bold">
+      Analytics & Vibe Score 📊
+    </h2>
+    <div className="flex gap-2">
+      <button
+        onClick={resetScores}
+        className="px-4 py-2 rounded-md border border-border text-muted-foreground hover:bg-white/5 transition text-sm"
+      >
+        Reset All
+      </button>
+    </div>
+  </div>
   <p className="text-muted-foreground text-center mb-10 max-w-2xl mx-auto">
-    Get visual insights into your productivity, focus, and coding patterns — all tracked by your AI copilots.
+    Track your productivity, focus, and coding patterns. Add scores as you complete tasks.
   </p>
 
   <div className="flex flex-wrap justify-center gap-10">
@@ -880,10 +1143,60 @@ export default function Box() {
       <div className="absolute inset-0 rounded-full border-[3px] border-dashed border-[#9B5CF5]/50 animate-spin-slow"></div>
       <BarChart3 className="w-8 h-8 text-[#9B5CF5] mb-2" />
       <h3 className="text-lg font-semibold">Vibe Score</h3>
-      <p className="text-3xl font-bold mt-1 text-white">87 / 100</p>
+      <p className="text-3xl font-bold mt-1 text-white">{scores.vibeScore} / 100</p>
       <p className="text-xs text-muted-foreground mt-2">
-        +18% this week 🚀
+        {scores.vibeScoreChange > 0 ? `+${scores.vibeScoreChange}% this week 🚀` : scores.vibeScoreChange < 0 ? `${scores.vibeScoreChange}% this week` : 'No change yet'}
       </p>
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={() => addVibeScore(5)}
+          className="px-2 py-1 text-xs rounded bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition"
+          title="Add 5 points"
+        >
+          +5
+        </button>
+        <button
+          onClick={() => addVibeScore(10)}
+          className="px-2 py-1 text-xs rounded bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition"
+          title="Add 10 points"
+        >
+          +10
+        </button>
+        <Dialog open={isVibeDialogOpen} onOpenChange={setIsVibeDialogOpen}>
+          <DialogTrigger asChild>
+            <button
+              className="px-2 py-1 text-xs rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
+              title="Set custom score"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Set Vibe Score</DialogTitle>
+              <DialogDescription>
+                Enter a custom vibe score (0-100)
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={customVibeScore}
+              onChange={(e) => setCustomVibeScore(e.target.value)}
+              placeholder="Enter score (0-100)"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsVibeDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={setCustomVibeScoreValue}>
+                Set Score
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </motion.div>
 
     {/* 🟣 Focus Rate */}
@@ -894,10 +1207,60 @@ export default function Box() {
       <div className="absolute inset-0 rounded-full border-[3px] border-dashed border-[#00E0FF]/50 animate-spin-reverse"></div>
       <ChartPie className="w-8 h-8 text-[#00E0FF] mb-2" />
       <h3 className="text-lg font-semibold">Focus Rate</h3>
-      <p className="text-3xl font-bold mt-1 text-white">92%</p>
+      <p className="text-3xl font-bold mt-1 text-white">{scores.focusRate}%</p>
       <p className="text-xs text-muted-foreground mt-2">
-        Avg: 6.3h/day 💻
+        Avg: {scores.focusAvgHours.toFixed(1)}h/day 💻
       </p>
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={() => addFocusRate(5)}
+          className="px-2 py-1 text-xs rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 transition"
+          title="Add 5%"
+        >
+          +5%
+        </button>
+        <button
+          onClick={() => addFocusRate(10)}
+          className="px-2 py-1 text-xs rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 transition"
+          title="Add 10%"
+        >
+          +10%
+        </button>
+        <Dialog open={isFocusDialogOpen} onOpenChange={setIsFocusDialogOpen}>
+          <DialogTrigger asChild>
+            <button
+              className="px-2 py-1 text-xs rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
+              title="Set custom rate"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Set Focus Rate</DialogTitle>
+              <DialogDescription>
+                Enter a custom focus rate (0-100%)
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={customFocusRate}
+              onChange={(e) => setCustomFocusRate(e.target.value)}
+              placeholder="Enter rate (0-100)"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsFocusDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={setCustomFocusRateValue}>
+                Set Rate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </motion.div>
 
     {/* 💻 Weekly Coding Time */}
@@ -908,10 +1271,60 @@ export default function Box() {
       <div className="absolute inset-0 rounded-full border-[3px] border-dashed border-[#7C3AED]/40 animate-spin-slow"></div>
       <Layers className="w-8 h-8 text-[#7C3AED] mb-2" />
       <h3 className="text-lg font-semibold">Weekly Coding</h3>
-      <p className="text-3xl font-bold mt-1 text-white">28h</p>
+      <p className="text-3xl font-bold mt-1 text-white">{scores.weeklyCodingHours.toFixed(1)}h</p>
       <p className="text-xs text-muted-foreground mt-2">
         TS • Python • Go
       </p>
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={() => addCodingHours(1)}
+          className="px-2 py-1 text-xs rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
+          title="Add 1 hour"
+        >
+          +1h
+        </button>
+        <button
+          onClick={() => addCodingHours(2)}
+          className="px-2 py-1 text-xs rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
+          title="Add 2 hours"
+        >
+          +2h
+        </button>
+        <Dialog open={isHoursDialogOpen} onOpenChange={setIsHoursDialogOpen}>
+          <DialogTrigger asChild>
+            <button
+              className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 transition"
+              title="Set custom hours"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Set Weekly Coding Hours</DialogTitle>
+              <DialogDescription>
+                Enter the total weekly coding hours
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              type="number"
+              min="0"
+              step="0.1"
+              value={customHours}
+              onChange={(e) => setCustomHours(e.target.value)}
+              placeholder="Enter hours (e.g., 25.5)"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsHoursDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={setCustomHoursValue}>
+                Set Hours
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </motion.div>
   </div>
 </section>

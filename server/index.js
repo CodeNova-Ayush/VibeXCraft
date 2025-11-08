@@ -2,8 +2,13 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { OpenAI } from 'openai';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Import routes
+import copilotRoutes from './routes/copilotRoutes.js';
+
+// Import middleware
+import { requestLogger } from './middleware/logger.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
 
@@ -11,294 +16,99 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:8080', 'http://localhost:8081', 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+}));
 app.use(express.json());
-
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Initialize Gemini
-const gemini = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
-
-// AI Copilot Prompts
-const COPILOT_PROMPTS = {
-  code: `You are a Code Copilot AI assistant. Your role is to:
-- Write, debug, and explain code inline
-- Provide code suggestions and improvements
-- Explain complex code concepts
-- Help with debugging errors
-- Suggest best practices and optimizations
-
-Always provide clear, concise, and helpful code-related assistance.`,
-  
-  meeting: `You are a Meeting Copilot AI assistant. Your role is to:
-- Record meeting notes and summaries
-- Generate action items from discussions
-- Extract key decisions and outcomes
-- Organize meeting information chronologically
-- Create follow-up task lists
-
-Provide structured, actionable meeting summaries.`,
-  
-  tutor: `You are a Tutor Copilot AI assistant. Your role is to:
-- Teach programming concepts clearly
-- Generate practice tasks and exercises
-- Explain complex topics in simple terms
-- Provide step-by-step learning paths
-- Answer questions and provide examples
-
-Make learning engaging and accessible.`,
-  
-  design: `You are a Design Copilot AI assistant. Your role is to:
-- Suggest UI/UX improvements
-- Provide color harmony recommendations
-- Generate CSS snippets and styling suggestions
-- Recommend design patterns and best practices
-- Help with responsive design and accessibility
-
-Focus on modern, clean, and user-friendly design solutions.`,
-  
-  workflow: `You are a Workflow Copilot AI assistant. Your role is to:
-- Plan sprints and project timelines
-- Auto-generate Kanban boards and task lists
-- Suggest workflow optimizations
-- Help with project management
-- Organize tasks by priority and dependencies
-
-Provide actionable workflow and project management guidance.`,
-};
-
-// Helper function to call OpenAI
-async function callCopilot(copilotType, userMessage, context = {}) {
-  try {
-    const systemPrompt = COPILOT_PROMPTS[copilotType] || COPILOT_PROMPTS.code;
-    
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage },
-    ];
-
-    // Add context if provided
-    if (context.code) {
-      messages.push({
-        role: 'assistant',
-        content: `Context: ${JSON.stringify(context)}`,
-      });
-    }
-
-    const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
-
-    return completion.choices[0].message.content;
-  } catch (error) {
-    console.error('OpenAI API Error:', error);
-    throw new Error(`AI Copilot error: ${error.message}`);
-  }
-}
-
-// Helper to call Gemini Agent
-async function callGeminiAgent(userMessage, history = []) {
-  if (!gemini) throw new Error('GEMINI_API_KEY not configured');
-  try {
-    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
-    const model = gemini.getGenerativeModel({ model: modelName });
-
-    const contents = [
-      ...history.map(h => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.content }] })),
-      { role: 'user', parts: [{ text: userMessage }] },
-    ];
-
-    const result = await model.generateContent({ contents });
-    const text = result?.response?.text?.() || '';
-    return text;
-  } catch (error) {
-    console.error('Gemini API Error:', error);
-    throw new Error(`Gemini agent error: ${error.message}`);
-  }
-}
+app.use(requestLogger);
 
 // Routes
+app.use('/api/copilots', copilotRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'VibeXCraft AI Copilots API is running' });
-});
-
-// Code Copilot
-app.post('/api/copilots/code', async (req, res) => {
+app.get('/health', async (req, res) => {
   try {
-    const { message, code, language, context } = req.body;
-    
-    const prompt = code 
-      ? `${message}\n\nHere's the code:\n\`\`\`${language}\n${code}\n\`\`\``
-      : message;
-    
-    const response = await callCopilot('code', prompt, { code, language, ...context });
+    const { getApiKeyStatus } = await import('./controllers/copilotController.js');
+    const apiKeyStatus = getApiKeyStatus();
     
     res.json({ 
-      success: true,
-      response,
-      copilot: 'Code Copilot',
+      status: 'ok', 
+      message: 'VibeXCraft AI Copilot API is running',
+      version: '3.0.0',
+      provider: 'OpenAI GPT',
+      endpoints: {
+        code: 'POST /api/copilots/code',
+        meeting: 'POST /api/copilots/meeting',
+        tutor: 'POST /api/copilots/tutor',
+        design: 'POST /api/copilots/design',
+        workflow: 'POST /api/copilots/workflow',
+      },
+      apiKey: apiKeyStatus.valid ? 'set' : 'not set',
+      apiKeyStatus: apiKeyStatus.message,
+      model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false,
+    res.json({
+      status: 'ok',
+      message: 'VibeXCraft AI Copilot API is running',
+      version: '3.0.0',
+      provider: 'OpenAI GPT',
+      apiKey: 'error checking',
       error: error.message,
     });
   }
 });
 
-// Meeting Copilot
-app.post('/api/copilots/meeting', async (req, res) => {
-  try {
-    const { message, transcript, participants } = req.body;
-    
-    const prompt = transcript
-      ? `Meeting Transcript:\n${transcript}\n\n${message}`
-      : message;
-    
-    const response = await callCopilot('meeting', prompt, { participants });
-    
-    res.json({ 
-      success: true,
-      response,
-      copilot: 'Meeting Copilot',
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// 404 handler
+app.use(notFoundHandler);
 
-// Tutor Copilot
-app.post('/api/copilots/tutor', async (req, res) => {
-  try {
-    const { message, topic, level, context } = req.body;
-    
-    const prompt = topic
-      ? `Topic: ${topic}\nLevel: ${level || 'beginner'}\n\n${message}`
-      : message;
-    
-    const response = await callCopilot('tutor', prompt, context);
-    
-    res.json({ 
-      success: true,
-      response,
-      copilot: 'Tutor Copilot',
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Design Copilot
-app.post('/api/copilots/design', async (req, res) => {
-  try {
-    const { message, designType, currentDesign, context } = req.body;
-    
-    const prompt = currentDesign
-      ? `Current Design:\n${currentDesign}\n\n${message}`
-      : message;
-    
-    const response = await callCopilot('design', prompt, { designType, ...context });
-    
-    res.json({ 
-      success: true,
-      response,
-      copilot: 'Design Copilot',
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Workflow Copilot
-app.post('/api/copilots/workflow', async (req, res) => {
-  try {
-    const { message, projectType, tasks, context } = req.body;
-    
-    const prompt = tasks
-      ? `Tasks:\n${JSON.stringify(tasks)}\n\n${message}`
-      : message;
-    
-    const response = await callCopilot('workflow', prompt, { projectType, ...context });
-    
-    res.json({ 
-      success: true,
-      response,
-      copilot: 'Workflow Copilot',
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Generic copilot endpoint
-app.post('/api/copilots/:type', async (req, res) => {
-  try {
-    const { type } = req.params;
-    const { message, ...context } = req.body;
-    
-    if (!COPILOT_PROMPTS[type]) {
-      return res.status(400).json({ 
-        success: false,
-        error: `Unknown copilot type: ${type}`,
-      });
-    }
-    
-    const response = await callCopilot(type, message, context);
-    
-    res.json({ 
-      success: true,
-      response,
-      copilot: `${type.charAt(0).toUpperCase() + type.slice(1)} Copilot`,
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// Gemini Agent endpoint
-app.post('/api/agent/gemini', async (req, res) => {
-  try {
-    const { message, history } = req.body;
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ success: false, error: 'message is required' });
-    }
-    const response = await callGeminiAgent(message, Array.isArray(history) ? history : []);
-    res.json({ success: true, response, agent: 'Gemini' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// Error handler (must be last)
+app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 VibeXCraft AI Copilots API running on port ${PORT}`);
+const server = app.listen(PORT, async () => {
+  console.log(`🚀 VibeXCraft AI Copilot API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔑 Using OpenAI GPT API`);
+  console.log(`🤖 AI Copilot: POST /api/copilots/code`);
+  
+  // Check API key status
+  try {
+    const { getApiKeyStatus } = await import('./controllers/copilotController.js');
+    const apiKeyStatus = getApiKeyStatus();
+    
+    if (!apiKeyStatus.valid) {
+      console.warn(`⚠️  WARNING: ${apiKeyStatus.message}`);
+      console.warn(`⚠️  To add your OpenAI API key:`);
+      console.warn(`   1. Get API key from: https://platform.openai.com/api-keys`);
+      console.warn(`   2. Open server/.env file`);
+      console.warn(`   3. Add: OPENAI_API_KEY=your_actual_api_key`);
+      console.warn(`   4. Restart the server`);
+    } else {
+      const apiKey = process.env.OPENAI_API_KEY;
+      console.log(`✅ OPENAI_API_KEY is set (${apiKey ? apiKey.substring(0, 15) + '...' : 'OK'})`);
+    }
+  } catch (error) {
+    console.error(`❌ Error checking API key: ${error.message}`);
+  }
+  
+  const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+  console.log(`📦 Using model: ${model}`);
+  console.log(`💡 Available models: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview`);
+});
+
+// Handle server errors gracefully
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use!`);
+    console.error(`💡 To fix this, run: lsof -ti:${PORT} | xargs kill -9`);
+    console.error(`💡 Or change the PORT in your .env file`);
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', error);
+    process.exit(1);
+  }
 });
 
 export default app;
-
